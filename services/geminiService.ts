@@ -1,4 +1,3 @@
-
 import { GoogleGenAI, Type } from "@google/genai";
 import { Palette } from '../types';
 
@@ -7,7 +6,9 @@ if (!process.env.API_KEY) {
 }
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-const model = "gemini-2.5-flash";
+const textModel = "gemini-2.5-flash";
+const imageGenModel = "imagen-3.0-generate-002";
+
 
 const paletteSchema = {
   type: Type.OBJECT,
@@ -46,7 +47,7 @@ export const generatePaletteFromImage = async (base64ImageData: string): Promise
 
   try {
     const response = await ai.models.generateContent({
-      model: model,
+      model: textModel,
       contents: { parts: [textPart, imagePart] },
       config: {
         responseMimeType: "application/json",
@@ -73,79 +74,8 @@ export const generatePaletteFromImage = async (base64ImageData: string): Promise
   }
 };
 
-export const getDesignSuggestions = async (palette: Palette, context: string, base64ImageData?: string, mimeType?: string): Promise<string> => {
-  try {
-    if (context === "Instagram Clothing Sale Post" && base64ImageData && mimeType) {
-      const imagePart = {
-        inlineData: {
-          mimeType: mimeType,
-          data: base64ImageData,
-        },
-      };
-
-      const textPart = {
-        text: `You are an expert Instagram marketing strategist and a savvy graphic designer, specializing in fashion e-commerce.
-
-You have been given an image and an accompanying color palette extracted from it. Your task is to generate creative and effective Instagram post ideas for a clothing sale based on this image and palette.
-
-**Image Analysis:**
-Analyze the provided image's content (e.g., is it a model wearing the clothes, a flat lay of a garment, or just the clothing item?). Adapt your suggestions based on this analysis.
-
-**Color Palette Information:**
-- Palette Name: "${palette.name}"
-- Palette Description: "${palette.description}"
-- Colors (Hex Codes): ${palette.hexCodes.join(', ')}
-
-**Your Task - Generate Post Ideas:**
-
-Based on the image and the color palette, provide a comprehensive set of ideas for an Instagram clothing sale post. Structure your response in markdown and include the following sections for **at least two distinct concepts**:
-
-## Concept 1: [Creative Title for the Concept]
-*   **Visual Design:** Describe how to create the post visually. Suggest how to use the provided color palette for background, text overlays, and graphic elements like price tags or 'SALE' banners. Mention specific design styles (e.g., minimalist, bold, retro). If the original image is good, suggest how to enhance it. If it's lacking, suggest adding a background, props, or a specific theme.
-*   **Catchy Caption:** Write a compelling and catchy caption. It should grab attention, describe the clothing, announce the sale, and have a clear call-to-action (e.g., "Shop the link in bio!"). Incorporate the mood of the color palette.
-*   **Hashtags:** Provide a list of 5-10 relevant and effective hashtags to maximize reach. Include a mix of popular, niche, and branded hashtags.
-
-## Concept 2: [Another Creative Title]
-*   **Visual Design:** (As above)
-*   **Catchy Caption:** (As above)
-*   **Hashtags:** (As above)
-`
-      };
-
-      const response = await ai.models.generateContent({
-        model: model,
-        contents: { parts: [textPart, imagePart] },
-      });
-
-      return response.text;
-
-    } else if (context === "Visual Prompt for AI" && base64ImageData && mimeType) {
-        const imagePart = {
-            inlineData: {
-                mimeType: mimeType,
-                data: base64ImageData,
-            },
-        };
-
-        const textPart = {
-            text: `You are an expert visual prompt generator. Your task is to describe the provided image in exact detail, creating a prompt that can be used in text-to-image AI tools like Midjourney, DALL·E, or Leonardo AI to regenerate an identical image.
-
-**Instructions:**
-- **Do not add extra elements or make assumptions** about anything not visible in the image.
-- **Focus on the following details**: clothing (style, fabric, color), pose (body language, position), body type, lighting (e.g., soft studio light, golden hour, cinematic), color palette (dominant and accent colors), background details (or lack thereof), and overall mood (e.g., serene, powerful, candid).
-- **Maintain the exact style and composition** of the original image (e.g., full-body shot, portrait, close-up).
-- **Your output must be a single, detailed paragraph of descriptive text.** Do not use markdown, headings, or lists. The goal is a concise but comprehensive prompt string.`,
-        };
-
-        const response = await ai.models.generateContent({
-            model: model,
-            contents: { parts: [textPart, imagePart] },
-        });
-
-        return response.text;
-
-    } else {
-      const prompt = `
+export const getDesignSuggestions = async (palette: Palette, context: string): Promise<string> => {
+  const prompt = `
     You are a helpful design assistant. Based on the following color palette, provide practical design suggestions for a "${context}".
 
     Palette Name: "${palette.name}"
@@ -155,18 +85,163 @@ Based on the image and the color palette, provide a comprehensive set of ideas f
     Provide actionable advice. For example, if the context is 'Website Landing Page', suggest which colors to use for backgrounds, text, buttons, and accents. Be concise and format your response using markdown for readability (e.g., use headings, bullet points).
   `;
 
-      const response = await ai.models.generateContent({
-        model: model,
-        contents: prompt,
-      });
+  try {
+    const response = await ai.models.generateContent({
+      model: textModel,
+      contents: prompt,
+    });
 
-      return response.text;
-    }
+    return response.text;
   } catch (error) {
     console.error("Error generating suggestions from Gemini:", error);
     if (error instanceof Error) {
         throw new Error(`Gemini API Error: ${error.message}`);
     }
     throw new Error("An unknown error occurred during suggestion generation.");
+  }
+};
+
+export const generateFashionModel = async (
+  base64ImageData: string,
+  gender: string,
+  ethnicity: string,
+  country: string,
+  additionalClothing: string
+): Promise<string> => {
+  // Step 1: Describe the clothing item
+  const imagePart = {
+    inlineData: {
+      mimeType: 'image/jpeg',
+      data: base64ImageData,
+    },
+  };
+
+  const textPart = {
+    text: "You are a fashion expert. Describe the piece of clothing in this image for an AI image generator. Be specific about the type of clothing (e.g., 't-shirt', 'dress'), color, pattern, style (e.g., 'vintage', 'modern'), and fabric texture if discernible. Focus only on the clothing item itself.",
+  };
+
+  let clothingDescription = '';
+  try {
+    const descriptionResponse = await ai.models.generateContent({
+      model: textModel,
+      contents: { parts: [textPart, imagePart] },
+    });
+    clothingDescription = descriptionResponse.text;
+  } catch (error) {
+    console.error("Error generating clothing description:", error);
+    if (error instanceof Error) {
+      throw new Error(`Gemini API Error (Description): ${error.message}`);
+    }
+    throw new Error("An unknown error occurred during clothing analysis.");
+  }
+
+  // Step 2: Generate an image of a model wearing the described clothing
+  const modelDetails = [
+    gender !== 'Unspecified' ? gender : '',
+    ethnicity !== 'Unspecified' ? ethnicity : '',
+    country ? `from ${country}` : ''
+  ].filter(Boolean).join(', ');
+
+  const wearingClause = `wearing this item: "${clothingDescription}"`;
+  const additionalClause = additionalClothing ? ` and is also styled with the following: "${additionalClothing}"` : '';
+
+  const generationPrompt = `
+    Photorealistic, full-body shot of a fashion model${modelDetails ? ` (${modelDetails})` : ''} ${wearingClause}${additionalClause}.
+    The model should be standing in a well-lit, minimalist studio with a neutral background.
+    The focus is on the complete outfit, showing how the items work together. The model should have a natural pose.
+  `;
+
+  try {
+    const imageResponse = await ai.models.generateImages({
+      model: imageGenModel,
+      prompt: generationPrompt,
+      config: {
+        numberOfImages: 1,
+        outputMimeType: 'image/jpeg',
+        aspectRatio: '3:4', // Portrait aspect ratio for models
+      },
+    });
+
+    if (!imageResponse.generatedImages || imageResponse.generatedImages.length === 0) {
+      throw new Error("The AI did not return any images.");
+    }
+
+    return imageResponse.generatedImages[0].image.imageBytes;
+
+  } catch (error) {
+    console.error("Error generating model image:", error);
+    if (error instanceof Error) {
+      throw new Error(`Gemini API Error (Image Gen): ${error.message}`);
+    }
+    throw new Error("An unknown error occurred during model image generation.");
+  }
+};
+
+export const changeClothingColour = async (
+  base64ImageData: string,
+  hexColor: string
+): Promise<string> => {
+  // Step 1: Describe the image in detail
+  const imagePart = {
+    inlineData: {
+      mimeType: 'image/jpeg',
+      data: base64ImageData,
+    },
+  };
+  
+  const textPart = {
+    text: "You are a visual analyst. Describe the piece of clothing in this image in extreme detail for an AI image generator. Focus on its shape, silhouette, texture, material, folds, wrinkles, seams, and any patterns or graphics. Also, describe the background and lighting conditions precisely. Be literal and exhaustive.",
+  };
+
+  let imageDescription = '';
+  try {
+    const descriptionResponse = await ai.models.generateContent({
+      model: textModel,
+      contents: { parts: [textPart, imagePart] },
+    });
+    imageDescription = descriptionResponse.text;
+  } catch (error) {
+    console.error("Error generating image description:", error);
+    if (error instanceof Error) {
+      throw new Error(`Gemini API Error (Description): ${error.message}`);
+    }
+    throw new Error("An unknown error occurred during image analysis.");
+  }
+
+  // Step 2: Generate a new image with the new color
+  const generationPrompt = `
+    Task: Recreate the following image with a single color modification.
+    Description of original image: "${imageDescription}"
+    Modification: Change the color of the main clothing item to the hex code "${hexColor}".
+    Instructions:
+    - The new image must be a photorealistic replica of the original.
+    - The shape, texture, material, folds, and shadows of the clothing must be perfectly preserved.
+    - The background, lighting, and any other elements must remain identical to the original.
+    - Only the color of the clothing item described should be altered.
+  `;
+
+  try {
+    const imageResponse = await ai.models.generateImages({
+      model: imageGenModel,
+      prompt: generationPrompt,
+      config: {
+        numberOfImages: 1,
+        outputMimeType: 'image/jpeg',
+        aspectRatio: '1:1',
+      },
+    });
+
+    if (!imageResponse.generatedImages || imageResponse.generatedImages.length === 0) {
+      throw new Error("The AI did not return any images.");
+    }
+
+    return imageResponse.generatedImages[0].image.imageBytes;
+
+  } catch (error) {
+    console.error("Error generating recolored image:", error);
+    if (error instanceof Error) {
+      throw new Error(`Gemini API Error (Image Gen): ${error.message}`);
+    }
+    throw new Error("An unknown error occurred during image recoloring.");
   }
 };
