@@ -9,8 +9,6 @@ interface SuggestionsPanelProps {
 }
 
 const suggestionContexts = [
-  "Visual Prompt for AI",
-  "Instagram Clothing Sale Post",
   "Website Landing Page",
   "Mobile App UI",
   "Brand Logo",
