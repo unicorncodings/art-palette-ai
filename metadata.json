@@ -1,5 +1,6 @@
 {
   "name": "Art Palette AI",
   "description": "An interactive application that uses AI to analyze an uploaded image, generate a color palette, and provide design suggestions for various contexts.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [],
+  "prompt": ""
 }

@@ -51,7 +51,13 @@ export default function App(): React.ReactNode {
     setError(null);
 
     try {
-      const generatedSuggestions = await getDesignSuggestions(palette, context);
+      let generatedSuggestions;
+      if ((context === 'Instagram Clothing Sale Post' || context === 'Visual Prompt for AI') && imageFile) {
+        const base64Data = await fileToBase64(imageFile);
+        generatedSuggestions = await getDesignSuggestions(palette, context, base64Data, imageFile.type);
+      } else {
+        generatedSuggestions = await getDesignSuggestions(palette, context);
+      }
       setSuggestions(generatedSuggestions);
     } catch (e) {
       console.error(e);
@@ -60,7 +66,7 @@ export default function App(): React.ReactNode {
     } finally {
       setIsLoadingSuggestions(false);
     }
-  }, [palette]);
+  }, [palette, imageFile]);
   
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
